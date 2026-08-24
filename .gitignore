@@ -1,0 +1,17 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+
+# Operating System metadata
+.DS_Store
+Thumbs.db
+
+# Large raw dataset (>100MB exceeds GitHub standard push limit)
+data/household_power_consumption.txt
