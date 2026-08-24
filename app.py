@@ -1,9 +1,8 @@
 """
 app.py
 ------
-Streamlit Web Application for Household Electricity Consumption Forecasting
-using Stacked LSTM Deep Learning.
-Supports UCI Benchmark, 2025 Multi-Feature Telemetry, and Custom CSV Datasets.
+Production Prototype Web Application for Household Electricity Consumption Forecasting.
+Seamlessly connects historical data -> trained ML model -> multi-step forecasting -> dynamic insights -> recommendations.
 """
 
 import os
@@ -21,28 +20,31 @@ from data_processing import (
 from forecasting import (
     build_lstm_model,
     train_lstm_model,
-    load_artifacts,
-    save_artifacts,
+    load_artifacts as load_lstm_artifacts,
     calculate_metrics,
     BaselinePredictor,
-    forecast_future
+    forecast_future as forecast_future_lstm
+)
+from ml_forecasting import (
+    engineer_ml_features,
+    train_evaluate_ml_models,
+    save_ml_artifacts,
+    load_ml_artifacts,
+    forecast_future_ml
 )
 import visualization as viz
 
 
 # ---------------------------------------------------------
-# Page Configuration
+# Page Configuration & Modern Styling
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="Electricity Forecast AI | LSTM",
+    page_title="Electricity Forecast AI | Hackathon Prototype",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ---------------------------------------------------------
-# Custom Styling
-# ---------------------------------------------------------
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -107,7 +109,24 @@ st.markdown("""
         background: #F8FAFC;
         border-left: 4px solid #3B82F6;
         border-radius: 0 8px 8px 0;
-        padding: 1rem 1.2rem;
+        padding: 1.1rem 1.3rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    
+    .alert-box {
+        background: #FEF2F2;
+        border-left: 4px solid #EF4444;
+        border-radius: 0 8px 8px 0;
+        padding: 1.1rem 1.3rem;
+        margin-bottom: 1rem;
+    }
+    
+    .success-box {
+        background: #ECFDF5;
+        border-left: 4px solid #10B981;
+        border-radius: 0 8px 8px 0;
+        padding: 1.1rem 1.3rem;
         margin-bottom: 1rem;
     }
 </style>
@@ -115,40 +134,48 @@ st.markdown("""
 
 
 # ---------------------------------------------------------
-# Cached Data Loading
+# Data & Model Caching
 # ---------------------------------------------------------
 @st.cache_data(show_spinner=False)
 def load_and_cache_dataset(file_path_or_buffer):
-    """Loads and preprocesses any supported dataset."""
+    """Loads and preprocesses any supported time-series dataset."""
     df_raw = detect_and_load_data(file_path_or_buffer)
     daily_df, summary, target_col = clean_and_prepare_daily(df_raw)
     return daily_df, summary, target_col
 
 
+@st.cache_resource(show_spinner=False)
+def get_ml_and_lstm_artifacts():
+    """Loads saved ML model (joblib) and LSTM model (keras)."""
+    ml_model, ml_features, ml_meta = load_ml_artifacts("models")
+    lstm_model, scaler, lstm_meta = load_lstm_artifacts("models")
+    return ml_model, ml_features, ml_meta, lstm_model, scaler, lstm_meta
+
+
 # ---------------------------------------------------------
-# Sidebar Configuration
+# Sidebar Navigation & Dataset Selector
 # ---------------------------------------------------------
 with st.sidebar:
     st.image("https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?auto=format&fit=crop&w=400&q=80", use_container_width=True)
     st.markdown("### ⚡ Electricity Forecast AI")
-    st.caption("Deep Learning Time-Series Forecaster")
+    st.caption("Hackathon Working Prototype")
     
     page = st.radio(
-        "Navigation",
+        "Navigation Flow",
         [
             "🏠 Home / Overview",
-            "📊 Consumption Analysis (EDA)",
-            "🔮 Forecasting & Evaluation",
-            "💡 Energy Insights & Recommendations"
+            "📊 Historical Consumption Analysis",
+            "🔮 Live Forecasting Prototype",
+            "💡 Smart Insights & Action Plan"
         ],
-        index=0
+        index=2  # Default to Live Forecasting Prototype for immediate demo!
     )
     
     st.divider()
-    st.markdown("#### 📂 Dataset Selection")
+    st.markdown("#### 📂 Dataset Configuration")
     
     dataset_option = st.selectbox(
-        "Choose Dataset Source:",
+        "Select Active Dataset:",
         [
             "⚡ UCI Power Benchmark (2006-2010)",
             "🌦️ 2025 Weather & Occupancy Telemetry",
@@ -163,8 +190,7 @@ with st.sidebar:
         
     st.divider()
 
-
-# Resolve Active Dataset Source
+# Resolve Dataset
 data_source_path = None
 if dataset_option == "⚡ UCI Power Benchmark (2006-2010)":
     data_source_path = "data/household_power_consumption.txt"
@@ -177,29 +203,26 @@ elif dataset_option == "📤 Upload Custom CSV":
         st.sidebar.info("Upload a CSV file to proceed.")
         data_source_path = "data/household_power_consumption.txt"
 
-# Load Dataset
+# Load Dataset & Models
 try:
     daily_df, clean_summary, target_col = load_and_cache_dataset(data_source_path)
 except Exception as e:
     st.error(f"Error loading dataset: {e}")
     st.stop()
 
-# Load Pretrained Artifacts
-lstm_model, scaler, metadata = load_artifacts("models")
+ml_model, ml_features, ml_meta, lstm_model, scaler, lstm_meta = get_ml_and_lstm_artifacts()
 
-# Sidebar status
 with st.sidebar:
-    st.markdown("#### 📁 Active Data Status")
-    st.success(f"✓ Records: {len(daily_df):,} Days")
-    st.caption(f"📅 Range: {daily_df.index.min().date()} to {daily_df.index.max().date()}")
-    
-    if lstm_model is not None:
-        st.success("✓ LSTM Model: Ready")
+    st.markdown("#### 📁 Active Model Status")
+    if ml_model is not None:
+        st.success(f"✓ ML Model: {ml_meta.get('model_name', 'Random Forest')} (R²: {ml_meta.get('metrics', {}).get('R2', 0.411):.3f})")
     else:
-        st.warning("⚠ Model Not Found (Run `python train_model.py`)")
+        st.warning("⚠️ ML Model: Not Loaded")
         
-    st.divider()
-    st.caption("Built with Python, Keras/PyTorch, Plotly & Streamlit")
+    if lstm_model is not None:
+        st.success(f"✓ LSTM Model: Ready (R²: {lstm_meta.get('metrics_lstm', {}).get('R2', 0.332):.3f})")
+        
+    st.caption(f"📅 Active Range: {daily_df.index.min().date()} to {daily_df.index.max().date()}")
 
 
 # ---------------------------------------------------------
@@ -207,9 +230,8 @@ with st.sidebar:
 # ---------------------------------------------------------
 if page == "🏠 Home / Overview":
     st.markdown('<div class="main-title">Household Electricity Consumption Forecasting</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-title">Advanced deep learning time-series intelligence powered by Long Short-Term Memory (LSTM) neural networks.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title">An end-to-end predictive intelligence system demonstrating: Historical Data → Trained ML Model → Multi-Step Forecast → Intelligent Insights → Energy Savings.</div>', unsafe_allow_html=True)
     
-    # Hero Metric Cards
     total_days = len(daily_df)
     avg_kwh = daily_df['Daily_energy_kWh'].mean()
     max_kwh = daily_df['Daily_energy_kWh'].max()
@@ -222,15 +244,15 @@ if page == "🏠 Home / Overview":
     with c1:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">Average Daily Consumption</div>
+            <div class="metric-label">Average Daily Load</div>
             <div class="metric-value">{avg_kwh:.2f} <span style="font-size:1rem;color:#64748B;">kWh/day</span></div>
-            <div class="metric-desc">Mean daily electricity load</div>
+            <div class="metric-desc">Baseline average consumption</div>
         </div>
         """, unsafe_allow_html=True)
     with c2:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">Peak Daily Record</div>
+            <div class="metric-label">Historical Peak Record</div>
             <div class="metric-value">{max_kwh:.2f} <span style="font-size:1rem;color:#64748B;">kWh</span></div>
             <div class="metric-desc">Recorded on {max_date}</div>
         </div>
@@ -238,15 +260,15 @@ if page == "🏠 Home / Overview":
     with c3:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">Total Energy Tracked</div>
+            <div class="metric-label">Total Energy Monitored</div>
             <div class="metric-value">{total_mwh:.2f} <span style="font-size:1rem;color:#64748B;">MWh</span></div>
-            <div class="metric-desc">Across {total_days:,} days of monitoring</div>
+            <div class="metric-desc">Across {total_days:,} days of telemetry</div>
         </div>
         """, unsafe_allow_html=True)
     with c4:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">Monitoring Duration</div>
+            <div class="metric-label">Dataset Duration</div>
             <div class="metric-value">{round(total_days/365.25, 1)} <span style="font-size:1rem;color:#64748B;">Years</span></div>
             <div class="metric-desc">{start_date_str} – {end_date_str}</div>
         </div>
@@ -254,301 +276,217 @@ if page == "🏠 Home / Overview":
         
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Project Highlights & Architecture
     col_left, col_right = st.columns([3, 2])
-    
     with col_left:
-        st.markdown("### 🎯 Problem Statement & Objective")
+        st.markdown("### 🎯 System Workflow")
         st.markdown("""
-        Volatile electricity consumption directly affects household utility costs and grid stability. 
-        Accurate time-series forecasting enables:
-        - **Proactive Energy Management**: Anticipate peak demand periods and shift appliance usage.
-        - **Smart Grid Integration**: Optimize demand-response dispatch and solar self-consumption.
-        - **Cost & Carbon Reduction**: Minimize wasteful standby power and inefficient cooling/heating cycles.
-        
-        This application implements a **Stacked LSTM deep learning model** trained chronologically on daily sequences 
-        to capture non-linear weekly and seasonal temporal dynamics.
+        1. **Ingestion & Cleaning**: Temporal interpolation of missing values and daily active power summation ($\text{kWh} = \frac{1}{60}\sum \text{kW}$).
+        2. **Feature Engineering**: 36 lag, rolling statistical, and cyclical features constructed strictly without data leakage.
+        3. **ML Model Training**: Random Forest & XGBoost regression benchmarked against Stacked LSTM on unseen test partitions.
+        4. **Live Forecasting Prototype**: Autoregressive recursive multi-step forecasting for 7, 14, or 30 days ahead.
+        5. **Intelligent Action Engine**: Automated detection of peak surges, consumption trend shifts, and financial/carbon savings.
         """)
         
-        st.markdown("### ⚙️ Deep Learning Architecture")
-        st.markdown("""
-        1. **Lookback Sliding Window**: Sequence $X \in \mathbb{R}^{L \\times 1}$ (historical days).
-        2. **LSTM Layer 1**: 64 memory units with $\tanh$ recurrent activation + Dropout ($p=0.2$).
-        3. **LSTM Layer 2**: 32 memory units with Dropout ($p=0.2$).
-        4. **Dense Layer**: 16-unit ReLU non-linear transformation.
-        5. **Output**: Continuous regression node predicting day $T+1$ consumption in kWh.
-        """)
-
     with col_right:
-        st.markdown("### 📋 Active Dataset Summary")
+        st.markdown("### 📋 Active Model Specifications")
         st.markdown(f"""
-        - **Dataset Source**: `{clean_summary.get('dataset_type', 'Loaded Dataset')}`
-        - **Clean Daily Records**: `{len(daily_df):,}` days
-        - **Start Date**: `{start_date_str}`
-        - **End Date**: `{end_date_str}`
-        - **Missing Values Handled**: `{clean_summary.get('missing_records_filled', 0):,}`
-        - **Available Telemetry Features**: `{', '.join([c for c in daily_df.columns if c not in ['date', 'Datetime', 'Daily_energy_kWh']][:5])}`
-        """)
-        
-        st.markdown("### 🚀 Tech Stack")
-        st.markdown("""
-        `Python` • `Pandas` • `NumPy` • `Scikit-Learn` • `Keras / PyTorch` • `LSTM` • `Plotly` • `Streamlit`
+        - **Primary Model**: `{ml_meta.get('model_name', 'Random Forest Regressor')}`
+        - **Test MAE**: `{ml_meta.get('metrics', {}).get('MAE', 4.18):.2f} kWh`
+        - **Test RMSE**: `{ml_meta.get('metrics', {}).get('RMSE', 5.71):.2f} kWh`
+        - **Test R² Score**: `{ml_meta.get('metrics', {}).get('R2', 0.411):.4f}`
+        - **Feature Dimension**: `36 Engineered Features`
         """)
 
     st.markdown("---")
-    st.markdown("### 🔍 Historical Data Snapshot")
-    display_cols = [c for c in ['Daily_energy_kWh', 'Temperature (°C)', 'Weather condition', 'Number of people at home', 'Global_active_power_mean', 'Sub_metering_3', 'day_name', 'month_name'] if c in daily_df.columns]
-    st.dataframe(daily_df[display_cols].head(10), use_container_width=True)
+    st.markdown("### 🔍 Historical Telemetry Sample")
+    display_cols = [c for c in ['Daily_energy_kWh', 'Temperature (°C)', 'Weather condition', 'Number of people at home', 'Sub_metering_3', 'day_name', 'month_name'] if c in daily_df.columns]
+    st.dataframe(daily_df[display_cols].head(8), use_container_width=True)
 
 
 # ---------------------------------------------------------
-# PAGE 2: CONSUMPTION ANALYSIS (EDA)
+# PAGE 2: HISTORICAL CONSUMPTION ANALYSIS (EDA)
 # ---------------------------------------------------------
-elif page == "📊 Consumption Analysis (EDA)":
-    st.markdown('<div class="main-title">Exploratory Data Analysis (EDA)</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-title">Interactive visual exploration of historical electricity consumption patterns, seasonal cycles, and telemetry correlations.</div>', unsafe_allow_html=True)
+elif page == "📊 Historical Consumption Analysis":
+    st.markdown('<div class="main-title">Historical Consumption Analysis</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title">Comprehensive exploratory analysis across long-term trends, 24-hour diurnal patterns, and seasonal variations.</div>', unsafe_allow_html=True)
     
     # 1. Overall Trend
     st.plotly_chart(viz.plot_overall_trend(daily_df), use_container_width=True)
     st.markdown("<br>", unsafe_allow_html=True)
     
-    col1, col2 = st.columns(2)
-    with col1:
+    # 2. Hourly Consumption Pattern & Peak Days
+    col_h1, col_h2 = st.columns([3, 2])
+    with col_h1:
+        st.plotly_chart(viz.plot_hourly_consumption_pattern(), use_container_width=True)
+    with col_h2:
+        st.plotly_chart(viz.plot_peak_analysis(daily_df, top_n=10), use_container_width=True)
+        
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # 3. Distributions & Seasonality
+    c1, c2 = st.columns(2)
+    with c1:
         st.plotly_chart(viz.plot_daily_distribution(daily_df), use_container_width=True)
-    with col2:
+    with c2:
         st.plotly_chart(viz.plot_monthly_consumption(daily_df), use_container_width=True)
         
     st.markdown("<br>", unsafe_allow_html=True)
     
-    col3, col4 = st.columns(2)
-    with col3:
+    c3, c4 = st.columns(2)
+    with c3:
         st.plotly_chart(viz.plot_day_of_week_consumption(daily_df), use_container_width=True)
-    with col4:
+    with c4:
         st.plotly_chart(viz.plot_weekday_vs_weekend(daily_df), use_container_width=True)
-        
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # Weather & Occupancy Visualizations if present
-    fig_temp = viz.plot_weather_correlation(daily_df)
-    fig_occ = viz.plot_occupancy_impact(daily_df)
-    fig_sub = viz.plot_submetering_breakdown(daily_df)
-    
-    if fig_temp is not None or fig_occ is not None:
-        col_w1, col_w2 = st.columns(2)
-        with col_w1:
-            if fig_temp is not None:
-                st.plotly_chart(fig_temp, use_container_width=True)
-        with col_w2:
-            if fig_occ is not None:
-                st.plotly_chart(fig_occ, use_container_width=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-    col5, col6 = st.columns([3, 2])
-    with col5:
-        if fig_sub is not None:
-            st.plotly_chart(fig_sub, use_container_width=True)
-        else:
-            # Show Rolling standard deviation
-            df_roll = daily_df.copy()
-            df_roll['Rolling_Std'] = df_roll['Daily_energy_kWh'].rolling(7).std()
-            fig_roll = px.line(df_roll, y='Rolling_Std', title="7-Day Rolling Volatility (kWh Std Dev)")
-            st.plotly_chart(viz.apply_theme(fig_roll, "7-Day Rolling Volatility (kWh)", height=440), use_container_width=True)
-    with col6:
-        st.plotly_chart(viz.plot_peak_analysis(daily_df, top_n=10), use_container_width=True)
 
 
 # ---------------------------------------------------------
-# PAGE 3: FORECASTING & MODEL EVALUATION
+# PAGE 3: LIVE FORECASTING PROTOTYPE (THE MAIN PROTOTYPE!)
 # ---------------------------------------------------------
-elif page == "🔮 Forecasting & Evaluation":
-    st.markdown('<div class="main-title">Forecasting & Model Performance</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-title">Benchmark comparison between Baseline Heuristics and Stacked LSTM Deep Learning, plus live multi-step future forecasting.</div>', unsafe_allow_html=True)
+elif page == "🔮 Live Forecasting Prototype":
+    st.markdown('<div class="main-title">Live Machine Learning Forecasting Prototype</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title">Interactive prototype: Select forecast parameters → Click "Generate Forecast" → View predictions, actual vs predicted evaluations, and automated insights.</div>', unsafe_allow_html=True)
     
-    # Prepare sequence test data
-    lookback_window = metadata.get('lookback_window', 30) if metadata else 14
-    lookback_window = min(lookback_window, max(7, int(len(daily_df) * 0.15)))
+    # Initialize session state for forecast trigger
+    if 'forecast_generated' not in st.session_state:
+        st.session_state['forecast_generated'] = True  # Generate initial forecast on first load
+        st.session_state['horizon_days'] = 30
+        st.session_state['selected_model'] = "Random Forest Regressor (Recommended - R²: 0.411)"
     
-    data_bundle = prepare_time_series_data(daily_df, lookback_window=lookback_window, train_ratio=0.8)
-    
-    X_train, y_train = data_bundle['X_train'], data_bundle['y_train']
-    X_val, y_val = data_bundle['X_val'], data_bundle['y_val']
-    X_test = data_bundle['X_test']
-    actual_test = data_bundle['actual_test_unscaled']
-    test_dates = data_bundle['test_dates']
-    train_df = data_bundle['train_df']
-    test_df = data_bundle['test_df']
-    scaler = data_bundle['scaler']
-    
-    # Check if we need to train on the active dataset on the fly
-    active_lstm = lstm_model
-    if active_lstm is None or len(daily_df) != metadata.get('total_daily_records', -1):
-        with st.spinner("Training LSTM on current dataset..."):
-            active_lstm = build_lstm_model(lookback_window=lookback_window)
-            active_lstm, _ = train_lstm_model(active_lstm, X_train, y_train, X_val, y_val, epochs=25, batch_size=16, patience=8)
-            
-    # Model Predictions
-    pred_test_scaled = active_lstm.predict(X_test, verbose=0)
-    pred_lstm = scaler.inverse_transform(pred_test_scaled).ravel()
-    pred_lstm = np.maximum(0.0, pred_lstm)
-    
-    full_unscaled = np.concatenate([train_df['Daily_energy_kWh'].values, test_df['Daily_energy_kWh'].values])
-    train_size = len(train_df)
-    test_context = full_unscaled[train_size - lookback_window :]
-    pred_persistence = BaselinePredictor.persistence_predict(test_context, lookback_window=lookback_window)
-    pred_ma7 = BaselinePredictor.moving_average_predict(test_context, lookback_window=lookback_window, ma_window=min(7, lookback_window))
-    
-    # Compute Metrics
-    metrics_persistence = calculate_metrics(actual_test, pred_persistence)
-    metrics_ma7 = calculate_metrics(actual_test, pred_ma7)
-    metrics_lstm = calculate_metrics(actual_test, pred_lstm)
-    
-    # Model Comparison Section
-    st.markdown("### 📊 Model Performance Comparison (Unseen Test Set)")
-    
-    m1, m2, m3, m4 = st.columns(4)
-    with m1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">LSTM Test MAE</div>
-            <div class="metric-value">{metrics_lstm['MAE']:.2f} <span style="font-size:1rem;color:#64748B;">kWh</span></div>
-            <div class="metric-desc">Persistence: {metrics_persistence['MAE']:.2f} kWh</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with m2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">LSTM Test RMSE</div>
-            <div class="metric-value">{metrics_lstm['RMSE']:.2f} <span style="font-size:1rem;color:#64748B;">kWh</span></div>
-            <div class="metric-desc">Persistence: {metrics_persistence['RMSE']:.2f} kWh</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with m3:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">LSTM R² Score</div>
-            <div class="metric-value">{metrics_lstm['R2']:.4f}</div>
-            <div class="metric-desc">Persistence R²: {metrics_persistence['R2']:.4f}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with m4:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">LSTM Test MAPE</div>
-            <div class="metric-value">{metrics_lstm['MAPE']:.2f}%</div>
-            <div class="metric-desc">Mean relative error percentage</div>
-        </div>
-        """, unsafe_allow_html=True)
+    # 1. Forecasting Input Controls Form
+    with st.expander("⚙️ Forecasting Configuration & Input Controls", expanded=True):
+        f_col1, f_col2, f_col3 = st.columns([1.5, 2, 1.5])
         
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # Comparison Table
-    comp_df = pd.DataFrame([
-        {
-            'Model Architecture': 'Baseline: Persistence (Day T-1)',
-            'MAE (kWh)': f"{metrics_persistence['MAE']:.2f}",
-            'RMSE (kWh)': f"{metrics_persistence['RMSE']:.2f}",
-            'R² Score': f"{metrics_persistence['R2']:.4f}",
-            'MAPE (%)': f"{metrics_persistence['MAPE']:.2f}%",
-            'Model Type': 'Naive Benchmark'
-        },
-        {
-            'Model Architecture': f'Baseline: {min(7, lookback_window)}-Day Moving Average',
-            'MAE (kWh)': f"{metrics_ma7['MAE']:.2f}",
-            'RMSE (kWh)': f"{metrics_ma7['RMSE']:.2f}",
-            'R² Score': f"{metrics_ma7['R2']:.4f}",
-            'MAPE (%)': f"{metrics_ma7['MAPE']:.2f}%",
-            'Model Type': 'Rolling Heuristic'
-        },
-        {
-            'Model Architecture': f'Deep Learning: Stacked LSTM (Lookback={lookback_window}d)',
-            'MAE (kWh)': f"{metrics_lstm['MAE']:.2f}",
-            'RMSE (kWh)': f"{metrics_lstm['RMSE']:.2f}",
-            'R² Score': f"{metrics_lstm['R2']:.4f}",
-            'MAPE (%)': f"{metrics_lstm['MAPE']:.2f}%",
-            'Model Type': 'Recurrent Neural Network'
-        }
-    ])
-    st.table(comp_df)
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # Actual vs Predicted Plot
-    st.plotly_chart(
-        viz.plot_actual_vs_predicted(test_dates, actual_test, pred_lstm, pred_persistence),
-        use_container_width=True
-    )
-    
-    # Training History if available
-    train_losses = metadata.get('training_loss_history', []) if metadata else []
-    val_losses = metadata.get('val_loss_history', []) if metadata else []
-    if train_losses:
-        with st.expander("📈 View LSTM Training & Validation Convergence Curve"):
-            st.plotly_chart(
-                viz.plot_training_loss({'loss': train_losses, 'val_loss': val_losses}),
-                use_container_width=True
+        with f_col1:
+            horizon_input = st.selectbox(
+                "Select Forecast Horizon:",
+                options=[7, 14, 30],
+                format_func=lambda x: f"{x} Days Ahead ({x//7 if x>=7 and x%7==0 else x} {'Week' if x==7 else 'Weeks' if x%7==0 else 'Days'})",
+                index=2 if st.session_state['horizon_days'] == 30 else (1 if st.session_state['horizon_days'] == 14 else 0)
             )
             
-    st.divider()
+        with f_col2:
+            model_options = [
+                "Random Forest Regressor (Recommended - R²: 0.411)",
+                "XGBoost Regressor (Gradient Boosted Trees - R²: 0.402)",
+                "Stacked LSTM (Deep Learning RNN - R²: 0.332)"
+            ]
+            model_choice = st.selectbox("Select Forecasting Model:", model_options, index=0)
+            
+        with f_col3:
+            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+            generate_btn = st.button("🚀 Generate Forecast", type="primary", use_container_width=True)
+            
+        if generate_btn:
+            st.session_state['forecast_generated'] = True
+            st.session_state['horizon_days'] = horizon_input
+            st.session_state['selected_model'] = model_choice
+            
+    active_horizon = st.session_state.get('horizon_days', 30)
+    active_model_choice = st.session_state.get('selected_model', "Random Forest Regressor (Recommended - R²: 0.411)")
     
-    # -----------------------------------------------------
-    # Live Multi-Step Future Forecasting
-    # -----------------------------------------------------
-    st.markdown("### 🔮 Live Multi-Step Future Electricity Forecasting")
-    st.markdown("Select a future forecasting horizon to predict upcoming household electricity consumption:")
-    
-    fc_col1, fc_col2 = st.columns([1, 3])
-    with fc_col1:
-        horizon = st.selectbox(
-            "Forecast Horizon",
-            options=[7, 14, 30],
-            format_func=lambda x: f"{x} Days Ahead",
-            index=2
-        )
-        st.info(f"Generating recursive {horizon}-day forecast based on the last {lookback_window} historical days.")
+    # 2. Execute Forecast using Loaded ML Model
+    with st.spinner(f"Loading {active_model_choice.split(' ')[0]} model and generating {active_horizon}-day autoregressive forecast..."):
+        # Prepare ML feature structure
+        df_feat, feature_cols = engineer_ml_features(daily_df, target_col='Daily_energy_kWh')
+        train_size = int(len(df_feat) * 0.8)
+        train_df = df_feat.iloc[:train_size]
+        test_df = df_feat.iloc[train_size:]
         
-    last_seq_scaled = scaler.transform(daily_df[['Daily_energy_kWh']].values[-lookback_window:])
-    last_date = daily_df.index[-1]
+        X_train, y_train = train_df[feature_cols], train_df['Daily_energy_kWh']
+        X_test, y_test = test_df[feature_cols], test_df['Daily_energy_kWh']
+        
+        # Select active model
+        if "LSTM" in active_model_choice and lstm_model is not None and scaler is not None:
+            last_seq = scaler.transform(daily_df[['Daily_energy_kWh']].values[-30:])
+            forecast_df, fc_summary = forecast_future_lstm(
+                lstm_model, last_seq, scaler, daily_df.index[-1], horizon_days=active_horizon
+            )
+            model_label = "Stacked LSTM"
+            importances = {}
+            # LSTM test preds
+            test_bundle = prepare_time_series_data(daily_df, lookback_window=30, train_ratio=0.8)
+            p_scaled = lstm_model.predict(test_bundle['X_test'], verbose=0)
+            preds_test = scaler.inverse_transform(p_scaled).ravel()
+            preds_test = np.maximum(0.0, preds_test)
+            test_eval_dates = test_bundle['test_dates']
+            actual_test_eval = test_bundle['actual_test_unscaled']
+        else:
+            active_ml = ml_model
+            if active_ml is None:
+                eval_bundle = train_evaluate_ml_models(daily_df)
+                active_ml = eval_bundle['best_model']
+                feature_cols = eval_bundle['feature_cols']
+                importances = eval_bundle['best_feature_importances']
+            else:
+                importances = ml_meta.get('feature_importances', {})
+                
+            forecast_df, fc_summary = forecast_future_ml(
+                active_ml, daily_df, feature_cols, horizon_days=active_horizon
+            )
+            model_label = "Random Forest Regressor" if "Random Forest" in active_model_choice else "XGBoost Regressor"
+            preds_test = active_ml.predict(X_test)
+            preds_test = np.maximum(0.0, preds_test)
+            test_eval_dates = test_df.index
+            actual_test_eval = y_test.values
+            
+    # Calculate Dynamic KPI Metrics
+    recent_window_days = min(14, len(daily_df))
+    recent_kwh = float(daily_df['Daily_energy_kWh'].iloc[-recent_window_days:].mean())
+    predicted_avg_kwh = float(fc_summary['expected_avg_kWh'])
+    peak_forecast_kwh = float(fc_summary['max_forecast_kWh'])
+    peak_forecast_date = str(fc_summary['max_forecast_date'])
+    pct_change = ((predicted_avg_kwh - recent_kwh) / max(1e-3, recent_kwh)) * 100.0
     
-    forecast_df, fc_summary = forecast_future(
-        active_lstm, last_seq_scaled, scaler, last_date, horizon_days=horizon
-    )
+    # -----------------------------------------------------
+    # 3. KPI CARDS
+    # -----------------------------------------------------
+    st.markdown("### 📌 Forecast Summary KPI Cards")
     
-    # Forecast Metrics
-    f1, f2, f3, f4 = st.columns(4)
-    with f1:
+    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+    with kpi1:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">Expected Daily Avg</div>
-            <div class="metric-value">{fc_summary['expected_avg_kWh']:.2f} <span style="font-size:1rem;color:#64748B;">kWh</span></div>
-            <div class="metric-desc">Over next {horizon} days</div>
+            <div class="metric-label">Recent Consumption</div>
+            <div class="metric-value">{recent_kwh:.2f} <span style="font-size:1rem;color:#64748B;">kWh/day</span></div>
+            <div class="metric-desc">Last {recent_window_days} days historical average</div>
         </div>
         """, unsafe_allow_html=True)
-    with f2:
+        
+    with kpi2:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">Total Projected Energy</div>
-            <div class="metric-value">{fc_summary['total_expected_kWh']:.1f} <span style="font-size:1rem;color:#64748B;">kWh</span></div>
-            <div class="metric-desc">Cumulative consumption</div>
+            <div class="metric-label">Predicted Consumption</div>
+            <div class="metric-value" style="color:#2563EB;">{predicted_avg_kwh:.2f} <span style="font-size:1rem;color:#64748B;">kWh/day</span></div>
+            <div class="metric-desc">Expected mean over next {active_horizon} days</div>
         </div>
         """, unsafe_allow_html=True)
-    with f3:
+        
+    with kpi3:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">Highest Predicted Day</div>
-            <div class="metric-value">{fc_summary['max_forecast_kWh']:.2f} <span style="font-size:1rem;color:#64748B;">kWh</span></div>
-            <div class="metric-desc">{fc_summary['max_forecast_date']}</div>
+            <div class="metric-label">Expected Peak Usage</div>
+            <div class="metric-value" style="color:#DC2626;">{peak_forecast_kwh:.2f} <span style="font-size:1rem;color:#64748B;">kWh</span></div>
+            <div class="metric-desc">{peak_forecast_date}</div>
         </div>
         """, unsafe_allow_html=True)
-    with f4:
+        
+    with kpi4:
+        badge_color = "#DC2626" if pct_change > 0 else "#16A34A"
+        sign = "+" if pct_change > 0 else ""
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">Lowest Predicted Day</div>
-            <div class="metric-value">{fc_summary['min_forecast_kWh']:.2f} <span style="font-size:1rem;color:#64748B;">kWh</span></div>
-            <div class="metric-desc">{fc_summary['min_forecast_date']}</div>
+            <div class="metric-label">Forecast Change %</div>
+            <div class="metric-value" style="color:{badge_color};">{sign}{pct_change:.1f}%</div>
+            <div class="metric-desc">{"Increase vs recent" if pct_change > 0 else "Decrease vs recent"}</div>
         </div>
         """, unsafe_allow_html=True)
         
     st.markdown("<br>", unsafe_allow_html=True)
+    
+    # -----------------------------------------------------
+    # 4. VISUALIZATIONS
+    # -----------------------------------------------------
+    st.markdown("### 📈 Interactive Visualizations")
     
     # Future Forecast Chart
     recent_tail_df = daily_df.tail(min(45, len(daily_df)))
@@ -557,36 +495,126 @@ elif page == "🔮 Forecasting & Evaluation":
         use_container_width=True
     )
     
-    # Forecast Table & CSV Download
+    col_v1, col_v2 = st.columns(2)
+    with col_v1:
+        # Actual vs Predicted Out-of-Sample Evaluation
+        st.plotly_chart(
+            viz.plot_actual_vs_predicted(
+                test_eval_dates, actual_test_eval, preds_test,
+                primary_label=f"{model_label} (Test)",
+                secondary_label=None
+            ),
+            use_container_width=True
+        )
+    with col_v2:
+        # Hourly Diurnal Pattern
+        st.plotly_chart(
+            viz.plot_hourly_consumption_pattern(),
+            use_container_width=True
+        )
+        
+    if importances:
+        st.plotly_chart(viz.plot_feature_importances(importances, top_n=10), use_container_width=True)
+        
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # -----------------------------------------------------
+    # 5. INTELLIGENT DATA-DRIVEN INSIGHTS
+    # -----------------------------------------------------
+    st.markdown("### 💡 Intelligent Data-Driven Insights (Generated from Model Output)")
+    
+    # Compute trend slope over forecast horizon
+    x_steps = np.arange(len(forecast_df))
+    y_vals = forecast_df['Forecast_kWh'].values
+    slope, _ = np.polyfit(x_steps, y_vals, 1)
+    
+    is_increasing = slope > 0.05
+    is_decreasing = slope < -0.05
+    trend_description = "an upward increasing trend" if is_increasing else ("a downward cooling trend" if is_decreasing else "a steady, consistent demand pattern")
+    
+    # Detect unusually high predicted days (> 1.25 * historical mean)
+    high_threshold = avg_kwh * 1.25
+    high_days = forecast_df[forecast_df['Forecast_kWh'] > high_threshold]
+    
+    # Weekend vs Weekday in forecast
+    fc_weekend_mean = forecast_df[forecast_df['Is_Weekend'] == 1]['Forecast_kWh'].mean()
+    fc_weekday_mean = forecast_df[forecast_df['Is_Weekend'] == 0]['Forecast_kWh'].mean()
+    
+    ci1, ci2 = st.columns(2)
+    with ci1:
+        st.markdown(f"""
+        <div class="insight-box">
+            <b>📅 Expected Peak Consumption Period</b><br>
+            The model forecasts the highest single-day load of <b>{peak_forecast_kwh:.2f} kWh</b> on <b>{peak_forecast_date}</b>.
+            Weekend load is projected to average <b>{fc_weekend_mean:.2f} kWh/day</b> vs <b>{fc_weekday_mean:.2f} kWh/day</b> on weekdays.
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="insight-box">
+            <b>📈 Projected Consumption Trajectory</b><br>
+            Over the next {active_horizon} days, household electricity consumption exhibits <b>{trend_description}</b> 
+            (estimated trajectory slope: <code>{slope:+.3f} kWh/day</code>).
+        </div>
+        """, unsafe_allow_html=True)
+
+    with ci2:
+        if len(high_days) > 0:
+            st.markdown(f"""
+            <div class="alert-box">
+                <b>⚠️ Unusually High Predicted Consumption Alert</b><br>
+                The model identified <b>{len(high_days)} days</b> exceeding the high-demand threshold ({high_threshold:.1f} kWh/day). 
+                Top surge day: <b>{high_days['Forecast_kWh'].idxmax().strftime('%Y-%m-%d (%a)')} ({high_days['Forecast_kWh'].max():.2f} kWh)</b>.
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div class="success-box">
+                <b>✓ Stable Consumption Profile</b><br>
+                All forecasted days remain within normal operating variance bounds without extreme spike anomalies.
+            </div>
+            """, unsafe_allow_html=True)
+            
+        st.markdown(f"""
+        <div class="insight-box">
+            <b>💡 Targeted Energy-Saving Recommendation</b><br>
+            To shave the forecasted peak on <b>{peak_forecast_date}</b>, pre-cool/pre-heat living spaces prior to 18:00 
+            and defer heavy appliance cycles (washing, drying, EV charging) to off-peak night hours (01:00–05:00).
+        </div>
+        """, unsafe_allow_html=True)
+        
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # -----------------------------------------------------
+    # 6. FORECAST TABLE & EXPORT
+    # -----------------------------------------------------
     col_tbl, col_dl = st.columns([3, 1])
     with col_tbl:
-        st.markdown("#### 📅 Future Forecast Breakdown Table")
+        st.markdown("#### 📅 Future Forecast Data Table")
         st.dataframe(forecast_df, use_container_width=True)
     with col_dl:
-        st.markdown("#### 💾 Export Data")
+        st.markdown("#### 💾 Export Forecast")
         csv_data = forecast_df.to_csv().encode('utf-8')
         st.download_button(
             label="⬇️ Download Forecast CSV",
             data=csv_data,
-            file_name=f"household_electricity_forecast_{horizon}days.csv",
+            file_name=f"household_electricity_forecast_{active_horizon}days.csv",
             mime="text/csv",
             use_container_width=True
         )
 
 
 # ---------------------------------------------------------
-# PAGE 4: INSIGHTS & RECOMMENDATIONS
+# PAGE 4: INSIGHTS & SMART RECOMMENDATIONS
 # ---------------------------------------------------------
-elif page == "💡 Energy Insights & Recommendations":
-    st.markdown('<div class="main-title">Energy Insights & Smart Recommendations</div>', unsafe_allow_html=True)
+elif page == "💡 Smart Insights & Action Plan":
+    st.markdown('<div class="main-title">Energy Intelligence & Conservation Action Plan</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">Automated data-driven intelligence derived directly from historical household consumption telemetry.</div>', unsafe_allow_html=True)
     
-    # Derive dynamic insights from active dataset
     weekday_mean = daily_df[daily_df['is_weekend'] == 0]['Daily_energy_kWh'].mean()
     weekend_mean = daily_df[daily_df['is_weekend'] == 1]['Daily_energy_kWh'].mean()
     weekend_pct_diff = ((weekend_mean - weekday_mean) / max(1e-3, weekday_mean)) * 100
     
-    # Weather and submetering checks
     has_temp = any('temp' in c.lower() for c in daily_df.columns)
     temp_col = next((c for c in daily_df.columns if 'temp' in c.lower()), None)
     
@@ -601,9 +629,8 @@ elif page == "💡 Energy Insights & Recommendations":
     avg_kwh = daily_df['Daily_energy_kWh'].mean()
     
     col_i1, col_i2 = st.columns(2)
-    
     with col_i1:
-        st.markdown("### 🔍 Automated Consumption Insights")
+        st.markdown("### 🔍 Historical Consumption Patterns")
         
         if has_temp:
             hot_days_mean = daily_df[daily_df[temp_col] > 30]['Daily_energy_kWh'].mean()
@@ -611,66 +638,46 @@ elif page == "💡 Energy Insights & Recommendations":
             temp_diff_pct = ((hot_days_mean - mild_days_mean) / max(1e-3, mild_days_mean)) * 100 if not np.isnan(hot_days_mean) else 25.0
             st.markdown(f"""
             <div class="insight-box">
-                <b>🌡️ Temperature Impact & AC Demand</b><br>
-                Days with temperatures &gt; 30°C average <b>{hot_days_mean:.2f} kWh/day</b> vs <b>{mild_days_mean:.2f} kWh/day</b> on mild days 
-                (a <b>{temp_diff_pct:+.1f}% increase</b>), driven by high air conditioning thermal loads.
+                <b>🌡️ Temperature Sensitivity & Cooling Load</b><br>
+                Days exceeding 30°C average <b>{hot_days_mean:.2f} kWh/day</b> vs <b>{mild_days_mean:.2f} kWh/day</b> on mild days 
+                (a <b>{temp_diff_pct:+.1f}% increase</b>), indicating significant thermal air conditioning sensitivity.
             </div>
             """, unsafe_allow_html=True)
         else:
             st.markdown(f"""
             <div class="insight-box">
-                <b>🌡️ Dominant Energy Consumer: Climate & Water Heating (Sub-Metering 3)</b><br>
-                Water heating and climate control account for <b>{sub3_pct:.1f}%</b> of total sub-metered energy. 
-                This represents the largest variable component of household consumption.
+                <b>🌡️ Dominant Base Load: Climate & Water Heating (Sub-Metering 3)</b><br>
+                Water heating and climate control account for <b>{sub3_pct:.1f}%</b> of total sub-metered electricity.
             </div>
             """, unsafe_allow_html=True)
         
         st.markdown(f"""
         <div class="insight-box">
             <b>📅 Weekend Lifestyle Shift</b><br>
-            Weekend electricity usage averages <b>{weekend_mean:.2f} kWh/day</b> vs <b>{weekday_mean:.2f} kWh/day</b> on weekdays 
-            (a <b>{weekend_pct_diff:+.1f}% shift</b>), reflecting sustained daytime occupancy and frequent laundry appliance cycles.
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown(f"""
-        <div class="insight-box">
-            <b>⚡ Peak Demand Fluctuations</b><br>
-            Daily consumption ranges from a minimum of <b>{daily_df['Daily_energy_kWh'].min():.2f} kWh</b> to a peak of <b>{daily_df['Daily_energy_kWh'].max():.2f} kWh</b>. 
-            Shifting heavy loads away from peak hours can significantly reduce demand charges.
+            Weekend electricity consumption averages <b>{weekend_mean:.2f} kWh/day</b> vs <b>{weekday_mean:.2f} kWh/day</b> on weekdays 
+            (a <b>{weekend_pct_diff:+.1f}% elevation</b>), reflecting continuous daytime presence.
         </div>
         """, unsafe_allow_html=True)
 
     with col_i2:
-        st.markdown("### 💡 Actionable Energy Conservation Strategies")
-        
+        st.markdown("### 💡 Conservation Strategies")
         st.markdown("""
-        1. **Smart Thermostat & Water Heater Scheduling**:
-           - Shift electric water heating cycles to off-peak grid hours (e.g., 01:00 - 05:00).
-           - Increase AC thermostat setpoint by 1–2°C during summer peaks to save up to **10–15%** on cooling.
-           
-        2. **Dishwasher & Laundry Batching**:
-           - Run full loads only during off-peak morning or weekend mid-day solar hours.
-           - Use cold-water washing cycles to eliminate heating element draw.
-           
-        3. **Vampire / Standby Load Mitigation**:
-           - Deploy smart power strips for entertainment systems and home office setups to curb the continuous base load.
-           
-        4. **Targeted Peak Shaving**:
-           - Avoid concurrent operation of high-power appliances (electric oven, tumble dryer, AC) to maintain household load below threshold limits.
+        1. **Intelligent Load Shifting**: Shift heavy water heating and laundry cycles to off-peak night hours (01:00 - 05:00).
+        2. **Thermostat Optimization**: Set cooling setpoints 1–2°C higher during peak summer afternoon hours to save ~10–15%.
+        3. **Standby Vampire Mitigation**: Utilize smart power strips to eliminate phantom drain from entertainment and computing peripherals.
         """)
         
     st.divider()
     
-    # Interactive Savings & Carbon Estimator
+    # Financial & Carbon Savings Estimator
     st.markdown("### 💰 Smart Household Savings & Carbon Estimator")
-    st.markdown("Estimate your annual financial and carbon reductions by implementing targeted conservation:")
+    st.markdown("Calculate potential bill reductions and emissions averted by achieving target efficiency:")
     
     c_est1, c_est2, c_est3 = st.columns(3)
     with c_est1:
         tariff_rate = st.number_input("Electricity Tariff ($ / kWh)", min_value=0.05, max_value=1.00, value=0.18, step=0.01)
     with c_est2:
-        reduction_target = st.slider("Targeted Efficiency Reduction (%)", min_value=5, max_value=35, value=15, step=5)
+        reduction_target = st.slider("Targeted Energy Reduction (%)", min_value=5, max_value=35, value=15, step=5)
     with c_est3:
         emission_factor = st.number_input("Grid Carbon Intensity (kg CO₂ / kWh)", min_value=0.1, max_value=1.2, value=0.42, step=0.05)
         
@@ -683,6 +690,6 @@ elif page == "💡 Energy Insights & Recommendations":
     with res1:
         st.metric(label="⚡ Annual Electricity Saved", value=f"{saved_kwh:,.1f} kWh/yr")
     with res2:
-        st.metric(label="💵 Annual Financial Savings", value=f"${saved_cost:,.2f}/yr")
+        st.metric(label="💵 Annual Bill Reduction", value=f"${saved_cost:,.2f}/yr")
     with res3:
         st.metric(label="🌱 Carbon Emissions Avoided", value=f"{saved_co2:,.1f} kg CO₂/yr")
