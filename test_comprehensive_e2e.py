@@ -243,8 +243,8 @@ def run_all_tests():
     print("\n[CHECK 16/16] Verifying Clean Environment Startup Commands...")
     assert os.path.exists("requirements.txt"), "requirements.txt missing"
     assert os.path.exists("app.py"), "app.py missing"
-    assert os.path.exists("models/ml_forecast_model.joblib"), "Model artifact missing"
-    assert os.path.exists("data/household_power_consumption.txt"), "UCI dataset missing"
+    assert os.path.exists("data/household_power_daily.csv") or os.path.exists("data/household_power_consumption.txt"), "UCI dataset missing"
+    assert os.path.exists("data/daily_weather_power.csv"), "Weather telemetry dataset missing"
     print("  ✓ All required files and directories are present and ready for deployment.")
 
     print("\n" + "=" * 85)

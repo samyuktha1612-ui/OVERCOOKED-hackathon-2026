@@ -27,13 +27,24 @@ UCI_NUMERIC_COLUMNS = [
 def detect_and_load_data(source: Union[str, io.BytesIO, pd.DataFrame]) -> pd.DataFrame:
     """
     Intelligently detects dataset format (UCI semicolon format or standard daily CSV)
-    and loads it into a clean DataFrame.
+    and loads it into a clean DataFrame. Automatically falls back to preprocessed
+    daily dataset in cloud deployments if raw 133MB text file is excluded from git.
     """
     if isinstance(source, pd.DataFrame):
         return source.copy()
         
     if isinstance(source, str) and not os.path.exists(source):
-        raise FileNotFoundError(f"File not found: {source}")
+        # Auto-fallback for cloud environments (Streamlit Cloud, Heroku, etc.)
+        if "household_power" in source and os.path.exists("data/household_power_daily.csv"):
+            source = "data/household_power_daily.csv"
+        elif "daily_weather" in source and os.path.exists("data/daily_weather_power.csv"):
+            source = "data/daily_weather_power.csv"
+        elif os.path.exists("data/household_power_daily.csv"):
+            source = "data/household_power_daily.csv"
+        elif os.path.exists("data/daily_weather_power.csv"):
+            source = "data/daily_weather_power.csv"
+        else:
+            raise FileNotFoundError(f"File not found: {source}")
         
     # Read sample to detect delimiter and columns
     if isinstance(source, str):

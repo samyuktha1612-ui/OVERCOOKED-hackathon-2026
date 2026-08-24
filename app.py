@@ -193,7 +193,12 @@ with st.sidebar:
 # Resolve Dataset
 data_source_path = None
 if dataset_option == "⚡ UCI Power Benchmark (2006-2010)":
-    data_source_path = "data/household_power_consumption.txt"
+    if os.path.exists("data/household_power_daily.csv"):
+        data_source_path = "data/household_power_daily.csv"
+    elif os.path.exists("data/household_power_consumption.txt"):
+        data_source_path = "data/household_power_consumption.txt"
+    else:
+        data_source_path = "data/daily_weather_power.csv"
 elif dataset_option == "🌦️ 2025 Weather & Occupancy Telemetry":
     data_source_path = "data/daily_weather_power.csv"
 elif dataset_option == "📤 Upload Custom CSV":
@@ -201,7 +206,12 @@ elif dataset_option == "📤 Upload Custom CSV":
         data_source_path = custom_file
     else:
         st.sidebar.info("Upload a CSV file to proceed.")
-        data_source_path = "data/household_power_consumption.txt"
+        if os.path.exists("data/household_power_daily.csv"):
+            data_source_path = "data/household_power_daily.csv"
+        elif os.path.exists("data/household_power_consumption.txt"):
+            data_source_path = "data/household_power_consumption.txt"
+        else:
+            data_source_path = "data/daily_weather_power.csv"
 
 # Load Dataset & Models
 try:
