@@ -206,6 +206,7 @@ elif dataset_option == "📤 Upload Custom CSV":
 # Load Dataset & Models
 try:
     daily_df, clean_summary, target_col = load_and_cache_dataset(data_source_path)
+    avg_kwh = float(daily_df['Daily_energy_kWh'].mean())
 except Exception as e:
     st.error(f"Error loading dataset: {e}")
     st.stop()
@@ -411,19 +412,25 @@ elif page == "🔮 Live Forecasting Prototype":
             test_eval_dates = test_bundle['test_dates']
             actual_test_eval = test_bundle['actual_test_unscaled']
         else:
-            active_ml = ml_model
-            if active_ml is None:
-                eval_bundle = train_evaluate_ml_models(daily_df)
-                active_ml = eval_bundle['best_model']
-                feature_cols = eval_bundle['feature_cols']
-                importances = eval_bundle['best_feature_importances']
-            else:
+            selected_key = "XGBoost" if "XGBoost" in active_model_choice else ("Gradient Boosting" if "Gradient" in active_model_choice else "Random Forest")
+            all_models = ml_meta.get('all_models', {}) if isinstance(ml_meta, dict) else {}
+            
+            if isinstance(all_models, dict) and selected_key in all_models:
+                active_ml = all_models[selected_key]
+                importances = ml_meta.get('feature_importances_by_model', {}).get(selected_key, ml_meta.get('feature_importances', {}))
+            elif ml_model is not None:
+                active_ml = ml_model
                 importances = ml_meta.get('feature_importances', {})
+            else:
+                eval_bundle = train_evaluate_ml_models(daily_df)
+                active_ml = eval_bundle['all_evaluations'].get(selected_key, {}).get('model', eval_bundle['best_model'])
+                feature_cols = eval_bundle['feature_cols']
+                importances = eval_bundle['all_evaluations'].get(selected_key, {}).get('feature_importances', eval_bundle['best_feature_importances'])
                 
             forecast_df, fc_summary = forecast_future_ml(
                 active_ml, daily_df, feature_cols, horizon_days=active_horizon
             )
-            model_label = "Random Forest Regressor" if "Random Forest" in active_model_choice else "XGBoost Regressor"
+            model_label = f"{selected_key} Regressor"
             preds_test = active_ml.predict(X_test)
             preds_test = np.maximum(0.0, preds_test)
             test_eval_dates = test_df.index
@@ -537,8 +544,10 @@ elif page == "🔮 Live Forecasting Prototype":
     high_days = forecast_df[forecast_df['Forecast_kWh'] > high_threshold]
     
     # Weekend vs Weekday in forecast
-    fc_weekend_mean = forecast_df[forecast_df['Is_Weekend'] == 1]['Forecast_kWh'].mean()
-    fc_weekday_mean = forecast_df[forecast_df['Is_Weekend'] == 0]['Forecast_kWh'].mean()
+    weekend_mask = forecast_df['Is_Weekend'] == 1
+    weekday_mask = forecast_df['Is_Weekend'] == 0
+    fc_weekend_mean = forecast_df[weekend_mask]['Forecast_kWh'].mean() if weekend_mask.any() else forecast_df['Forecast_kWh'].mean()
+    fc_weekday_mean = forecast_df[weekday_mask]['Forecast_kWh'].mean() if weekday_mask.any() else forecast_df['Forecast_kWh'].mean()
     
     ci1, ci2 = st.columns(2)
     with ci1:

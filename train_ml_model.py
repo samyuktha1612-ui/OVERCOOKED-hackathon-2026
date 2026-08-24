@@ -69,6 +69,7 @@ def run_ml_training_pipeline(
     print(fc_df.head())
     
     # 4. Save Artifacts
+    models_dict = {k: v['model'] for k, v in eval_bundle['all_evaluations'].items()}
     meta = {
         'model_name': best_name,
         'metrics': best_metrics,
@@ -77,13 +78,16 @@ def run_ml_training_pipeline(
         },
         'feature_cols': feature_cols,
         'feature_importances': importances,
+        'feature_importances_by_model': {
+            k: v['feature_importances'] for k, v in eval_bundle['all_evaluations'].items()
+        },
         'train_samples': len(eval_bundle['train_df']),
         'test_samples': len(eval_bundle['test_df']),
         'target_col': 'Daily_energy_kWh'
     }
     
-    save_ml_artifacts(best_model, feature_cols, meta, model_dir=save_dir)
-    print("\n[SUCCESS] Machine learning model trained and saved to models/ml_forecast_model.joblib successfully!")
+    save_ml_artifacts(best_model, feature_cols, meta, model_dir=save_dir, all_models=models_dict)
+    print("\n[SUCCESS] Machine learning models trained and saved to models/ directory successfully!")
     
     return eval_bundle
 

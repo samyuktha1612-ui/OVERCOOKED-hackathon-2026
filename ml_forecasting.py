@@ -217,25 +217,32 @@ def save_ml_artifacts(
     model: Any,
     feature_cols: List[str],
     metadata: Dict[str, Any],
-    model_dir: str = "models"
+    model_dir: str = "models",
+    all_models: Optional[Dict[str, Any]] = None
 ) -> None:
-    """Saves the trained machine learning model and configuration using joblib."""
+    """Saves the trained machine learning model(s) and configuration using joblib."""
     os.makedirs(model_dir, exist_ok=True)
     
     model_path = os.path.join(model_dir, "ml_forecast_model.joblib")
+    all_models_path = os.path.join(model_dir, "all_ml_models.joblib")
     config_path = os.path.join(model_dir, "ml_feature_config.json")
     meta_path = os.path.join(model_dir, "ml_metadata.json")
     
-    print(f"[INFO] Saving ML model to {model_path} via joblib...")
+    print(f"[INFO] Saving primary ML model to {model_path} via joblib...")
     joblib.dump(model, model_path)
+    
+    if all_models is not None:
+        print(f"[INFO] Saving all candidate ML models to {all_models_path}...")
+        joblib.dump(all_models, all_models_path)
     
     print(f"[INFO] Saving feature configuration to {config_path}...")
     with open(config_path, "w") as f:
         json.dump({'feature_cols': feature_cols}, f, indent=4)
         
+    serializable_meta = {k: v for k, v in metadata.items() if k != 'all_models'}
     print(f"[INFO] Saving ML metadata to {meta_path}...")
     with open(meta_path, "w") as f:
-        json.dump(metadata, f, indent=4)
+        json.dump(serializable_meta, f, indent=4)
         
     print("[INFO] Machine learning artifacts persisted successfully.")
 
@@ -248,6 +255,7 @@ def load_ml_artifacts(model_dir: str = "models") -> Tuple[Optional[Any], Optiona
         Tuple of (model, feature_cols, metadata) or (None, None, None) if not found.
     """
     model_path = os.path.join(model_dir, "ml_forecast_model.joblib")
+    all_models_path = os.path.join(model_dir, "all_ml_models.joblib")
     config_path = os.path.join(model_dir, "ml_feature_config.json")
     meta_path = os.path.join(model_dir, "ml_metadata.json")
     
@@ -262,6 +270,16 @@ def load_ml_artifacts(model_dir: str = "models") -> Tuple[Optional[Any], Optiona
         if os.path.exists(meta_path):
             with open(meta_path, "r") as f:
                 metadata = json.load(f)
+                
+        if os.path.exists(all_models_path):
+            try:
+                metadata['all_models'] = joblib.load(all_models_path)
+            except Exception as e:
+                print(f"[NOTE] Could not load all_ml_models: {e}")
+                metadata['all_models'] = {metadata.get('model_name', 'Random Forest'): model}
+        else:
+            metadata['all_models'] = {metadata.get('model_name', 'Random Forest'): model}
+            
         return model, config['feature_cols'], metadata
     except Exception as e:
         print(f"[WARNING] Failed to load ML artifacts: {e}")
