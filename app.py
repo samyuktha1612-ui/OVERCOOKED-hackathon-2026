@@ -1252,9 +1252,9 @@ elif page == "🧠 ML Model":
             Standard Feedforward networks suffer from the <i>vanishing gradient problem</i> when learning over multi-week lookback windows. 
             <b>LSTM solves this</b> through dedicated memory cell states regulated by three continuous gating mechanisms:
             <ul>
-                <li><b>Forget Gate ($\mathbf{f}_t$)</b>: Selectively discards obsolete historical load states.</li>
-                <li><b>Input Gate ($\mathbf{i}_t$)</b>: Incorporates recent consumption spikes and temperature swings into the memory state.</li>
-                <li><b>Output Gate ($\mathbf{o}_t$)</b>: Produces the continuous kilowatt-hour demand prediction.</li>
+                <li><b>Forget Gate (f_t)</b>: Selectively discards obsolete historical load states.</li>
+                <li><b>Input Gate (i_t)</b>: Incorporates recent consumption spikes and temperature swings into the memory state.</li>
+                <li><b>Output Gate (o_t)</b>: Produces the continuous kilowatt-hour demand prediction.</li>
             </ul>
         </div>
     </div>
