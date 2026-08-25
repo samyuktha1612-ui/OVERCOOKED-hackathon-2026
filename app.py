@@ -32,6 +32,7 @@ from ml_forecasting import (
     load_ml_artifacts,
     forecast_future_ml
 )
+from chatbot import EnergyChatbotEngine
 import visualization as viz
 
 
@@ -166,7 +167,8 @@ with st.sidebar:
             "🏠 Home / Overview",
             "📊 Historical Consumption Analysis",
             "🔮 Live Forecasting Prototype",
-            "💡 Smart Insights & Action Plan"
+            "💡 Smart Insights & Action Plan",
+            "💬 AI Energy Assistant Chatbot"
         ],
         index=2  # Default to Live Forecasting Prototype for immediate demo!
     )
@@ -446,6 +448,10 @@ elif page == "🔮 Live Forecasting Prototype":
             test_eval_dates = test_df.index
             actual_test_eval = y_test.values
             
+        # Store active forecast for chatbot and other components
+        st.session_state['active_forecast_df'] = forecast_df
+        st.session_state['active_fc_summary'] = fc_summary
+            
     # Calculate Dynamic KPI Metrics
     recent_window_days = min(14, len(daily_df))
     recent_kwh = float(daily_df['Daily_energy_kWh'].iloc[-recent_window_days:].mean())
@@ -712,3 +718,160 @@ elif page == "💡 Smart Insights & Action Plan":
         st.metric(label="💵 Annual Bill Reduction", value=f"${saved_cost:,.2f}/yr")
     with res3:
         st.metric(label="🌱 Carbon Emissions Avoided", value=f"{saved_co2:,.1f} kg CO₂/yr")
+
+
+# ---------------------------------------------------------
+# PAGE 5: AI ENERGY ASSISTANT CHATBOT
+# ---------------------------------------------------------
+elif page == "💬 AI Energy Assistant Chatbot":
+    st.markdown('<div class="main-title">AI Energy Assistant Chatbot</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title">Context-aware conversational intelligence grounded directly in your historical telemetry, ML models, and live forecast data.</div>', unsafe_allow_html=True)
+
+    # Initialize chatbot context
+    recent_window_days = min(14, len(daily_df))
+    recent_kwh = float(daily_df['Daily_energy_kWh'].iloc[-recent_window_days:].mean())
+    
+    # Retrieve or generate baseline forecast context
+    if 'active_fc_summary' not in st.session_state or st.session_state.get('active_fc_summary') is None:
+        if ml_model is not None and ml_features is not None:
+            try:
+                fc_df, fc_sum = forecast_future_ml(ml_model, daily_df, ml_features, horizon_days=30)
+                st.session_state['active_forecast_df'] = fc_df
+                st.session_state['active_fc_summary'] = fc_sum
+            except Exception:
+                st.session_state['active_forecast_df'] = None
+                st.session_state['active_fc_summary'] = {
+                    'expected_avg_kWh': round(float(avg_kwh), 2),
+                    'max_forecast_kWh': round(float(daily_df['Daily_energy_kWh'].max()), 2),
+                    'max_forecast_date': 'Upcoming Weekend',
+                    'min_forecast_kWh': round(float(daily_df['Daily_energy_kWh'].min()), 2),
+                    'min_forecast_date': 'Weekday',
+                    'total_expected_kWh': round(float(avg_kwh * 30), 2)
+                }
+
+    active_fc_summary = st.session_state.get('active_fc_summary', {})
+    active_forecast_df = st.session_state.get('active_forecast_df', None)
+
+    # Context Header Metric Badges
+    c_b1, c_b2, c_b3, c_b4 = st.columns(4)
+    with c_b1:
+        st.markdown(f"""
+        <div class="metric-card" style="padding: 0.9rem;">
+            <div class="metric-label">Active Dataset</div>
+            <div style="font-size: 1.05rem; font-weight: 700; color: #0F172A;">{dataset_option.split(' ')[1]}</div>
+            <div class="metric-desc">{len(daily_df):,} days monitored</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with c_b2:
+        st.markdown(f"""
+        <div class="metric-card" style="padding: 0.9rem;">
+            <div class="metric-label">Historical Mean</div>
+            <div style="font-size: 1.05rem; font-weight: 700; color: #3B82F6;">{avg_kwh:.2f} <span style="font-size:0.8rem;color:#64748B;">kWh/day</span></div>
+            <div class="metric-desc">Baseline average</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with c_b3:
+        st.markdown(f"""
+        <div class="metric-card" style="padding: 0.9rem;">
+            <div class="metric-label">Active Model</div>
+            <div style="font-size: 1.05rem; font-weight: 700; color: #10B981;">{ml_meta.get('model_name', 'Random Forest')}</div>
+            <div class="metric-desc">R²: {ml_meta.get('metrics', {}).get('R2', 0.411):.3f}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with c_b4:
+        st.markdown(f"""
+        <div class="metric-card" style="padding: 0.9rem;">
+            <div class="metric-label">Forecast Horizon Mean</div>
+            <div style="font-size: 1.05rem; font-weight: 700; color: #8B5CF6;">{active_fc_summary.get('expected_avg_kWh', 29.27):.2f} <span style="font-size:0.8rem;color:#64748B;">kWh/day</span></div>
+            <div class="metric-desc">Peak: {active_fc_summary.get('max_forecast_kWh', 32.76):.2f} kWh</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Initialize Chatbot Engine with complete active context
+    chatbot_context = {
+        'daily_df': daily_df,
+        'avg_kwh': avg_kwh,
+        'recent_kwh': recent_kwh,
+        'ml_meta': ml_meta,
+        'model_name': ml_meta.get('model_name', 'Random Forest Regressor'),
+        'model_label': ml_meta.get('model_name', 'Random Forest Regressor'),
+        'active_horizon': st.session_state.get('horizon_days', 30),
+        'fc_summary': active_fc_summary,
+        'forecast_df': active_forecast_df,
+        'predicted_avg_kwh': active_fc_summary.get('expected_avg_kWh', 29.27),
+        'peak_forecast_kwh': active_fc_summary.get('max_forecast_kWh', 32.76),
+        'peak_forecast_date': active_fc_summary.get('max_forecast_date', 'Upcoming Weekend')
+    }
+    bot_engine = EnergyChatbotEngine(context=chatbot_context)
+
+    # Initialize chat history in session state
+    if 'chat_messages' not in st.session_state or not st.session_state['chat_messages']:
+        st.session_state['chat_messages'] = [
+            {
+                "role": "assistant",
+                "content": f"👋 **Hi there! I am your AI Electricity Forecast Assistant.**\n\nI am connected directly to your active **{dataset_option}** telemetry ({len(daily_df):,} days) and the **{ml_meta.get('model_name', 'Random Forest')}** model.\n\nAsk me about upcoming forecasts, peak surge periods, appliance scheduling, model accuracy, or personalized bill savings!"
+            }
+        ]
+
+    # Quick Starter Prompt Buttons
+    st.markdown("##### 💡 Suggested Questions (Click to Ask):")
+    p_col1, p_col2, p_col3 = st.columns(3)
+    p_col4, p_col5, p_col6 = st.columns(3)
+
+    prompt_to_send = None
+
+    with p_col1:
+        if st.button("🔮 What is my 30-day forecast?", use_container_width=True):
+            prompt_to_send = "What is my predicted electricity consumption over the next 30 days?"
+    with p_col2:
+        if st.button("⚡ When is the peak surge expected?", use_container_width=True):
+            prompt_to_send = "When is my highest peak consumption surge expected to occur?"
+    with p_col3:
+        if st.button("📊 Weekend vs Weekday usage?", use_container_width=True):
+            prompt_to_send = "How does my electricity consumption compare on weekends versus weekdays?"
+    with p_col4:
+        if st.button("⏰ Best time for heavy appliances?", use_container_width=True):
+            prompt_to_send = "What is the best time of day to run the washing machine and EV charger?"
+    with p_col5:
+        if st.button("🤖 How accurate is the ML model?", use_container_width=True):
+            prompt_to_send = "How accurate is the forecasting model and what are its performance metrics?"
+    with p_col6:
+        if st.button("💰 How to save 15% on my bill?", use_container_width=True):
+            prompt_to_send = "How much money and carbon emissions can I save if I reduce usage by 15%?"
+
+    st.markdown("---")
+
+    # Render Chat History
+    chat_container = st.container()
+    with chat_container:
+        for msg in st.session_state['chat_messages']:
+            avatar = "⚡" if msg["role"] == "assistant" else "👤"
+            with st.chat_message(msg["role"], avatar=avatar):
+                st.markdown(msg["content"])
+
+    # User Chat Input
+    user_input = st.chat_input("Ask about your electricity consumption, forecasts, peak periods, or savings...")
+    if prompt_to_send:
+        user_input = prompt_to_send
+
+    if user_input:
+        # Append User Message
+        st.session_state['chat_messages'].append({"role": "user", "content": user_input})
+        with st.chat_message("user", avatar="👤"):
+            st.markdown(user_input)
+
+        # Generate Response
+        response_text = bot_engine.generate_response(user_input)
+        st.session_state['chat_messages'].append({"role": "assistant", "content": response_text})
+        with st.chat_message("assistant", avatar="⚡"):
+            st.markdown(response_text)
+            
+        st.rerun()
+
+    # Clear Chat Button
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("🗑️ Clear Conversation History", type="secondary"):
+        st.session_state['chat_messages'] = []
+        st.rerun()

@@ -43,13 +43,15 @@ python3 test_comprehensive_e2e.py
 
 | File / Folder | Purpose |
 |---|---|
-| `app.py` | **Main Application**: Interactive Streamlit Web App with live forecasting, KPI cards, Plotly charts, dynamic insights, and report export. |
+| `app.py` | **Main Application**: Interactive Streamlit Web App with live forecasting, KPI cards, Plotly charts, dynamic insights, AI Chatbot, and report export. |
+| `chatbot.py` | **Conversational AI Engine**: Grounded domain-specific chatbot answering queries on forecasts, peak demand, weekend/weekday shifts, ML accuracy, and appliance scheduling. |
 | `data_processing.py` | **Data Pipeline**: Intelligent auto-format detection (UCI semicolon or standard CSV), missing value interpolation, daily kilowatt-hour aggregation ($\text{kWh} = \frac{1}{60}\sum \text{kW}$), calendar attributes. |
 | `ml_forecasting.py` | **ML Engine**: 36 engineered time-series features (lags, rolling stats, cyclical, ratios), leak-free training, autoregressive multi-step recursive forecasting for Random Forest & XGBoost. |
 | `forecasting.py` | **Deep Learning Engine**: Time-series sequencing, MinMaxScaler scaling, Stacked LSTM model architecture, autoregressive recursive multi-step forecasting. |
 | `visualization.py` | **Visualization Suite**: Interactive Plotly charts (forecasts with confidence bands, actual vs predicted with range sliders, 24h diurnal profiles, feature importances, peak analyses, weather/occupancy correlations). |
-| `test_comprehensive_e2e.py` | **Automated Test Suite**: 16-point comprehensive end-to-end verification covering ingestion, features, models, dynamic KPIs, and UI safety. |
-| `data/` | **Data Directory**: `household_power_consumption.txt` (2M+ UCI records) and `daily_weather_power.csv` (2025 weather & occupancy dataset). |
+| `test_comprehensive_e2e.py` | **Automated Test Suite**: 17-point comprehensive end-to-end verification covering ingestion, features, models, dynamic KPIs, Chatbot engine, and UI safety. |
+| `test_chatbot.py` | **Chatbot Unit Tests**: Automated unit testing for all natural language query categories and context grounding. |
+| `data/` | **Data Directory**: `household_power_daily.csv` (1,442 continuous days) and `daily_weather_power.csv` (2025 weather & occupancy dataset). |
 | `models/` | **Model Artifacts**: Pre-trained model weights, scalers, feature configurations, and metadata JSON. |
 | `requirements.txt` | **Dependencies**: Exact package versions required for zero-friction setup. |
 
@@ -113,4 +115,10 @@ Follow this 5-minute presentation script to deliver a high-impact demo to hackat
 2. **Interactive Savings Estimator:**
    - Adjust the **Electricity Tariff ($/kWh)**, **Targeted Reduction (%)**, and **Carbon Intensity (kg CO₂/kWh)**.
    - Show how the live calculator outputs exact annual dollar savings and metric tons of carbon emissions avoided.
-3. Conclude: *"This is a production-ready, fully verified intelligence system ready for residential and smart-grid deployment."*
+
+### **Step 6: AI Energy Assistant Chatbot (1 min)**
+1. Switch to **💬 AI Energy Assistant Chatbot** in the sidebar.
+2. Click any of the **Suggested Quick-Question Buttons** (e.g. *"🔮 What is my 30-day forecast?"* or *"⏰ Best time for heavy appliances?"*).
+3. Type custom natural language questions (e.g. *"How accurate is the Random Forest model?"* or *"Compare weekend vs weekday load"*).
+4. Highlight that the chatbot is **grounded directly in the live telemetry and ML model outputs** in real-time.
+5. Conclude: *"This is a production-ready, fully verified intelligence system ready for residential and smart-grid deployment."*

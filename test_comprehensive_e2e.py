@@ -231,24 +231,48 @@ def run_all_tests():
     print(f"  ✓ CSV Export Buffer verified: {len(csv_export)} bytes generated for download")
 
     # -------------------------------------------------------------
-    # 15. NO CONSOLE / RUNTIME ERRORS
+    # 15. AI ENERGY ASSISTANT CHATBOT VERIFICATION
     # -------------------------------------------------------------
-    print("\n[CHECK 15/16] Testing Clean app.py Module Import...")
+    print("\n[CHECK 15/17] Testing AI Energy Assistant Chatbot Engine...")
+    from chatbot import EnergyChatbotEngine
+    bot_engine = EnergyChatbotEngine(context={
+        'daily_df': daily_df,
+        'avg_kwh': avg_kwh,
+        'recent_kwh': recent_kwh,
+        'ml_meta': ml_meta,
+        'model_name': 'Random Forest Regressor',
+        'model_label': 'Random Forest Regressor',
+        'active_horizon': 30,
+        'fc_summary': sum_rf,
+        'forecast_df': fc_rf,
+        'predicted_avg_kwh': sum_rf['expected_avg_kWh'],
+        'peak_forecast_kwh': sum_rf['max_forecast_kWh'],
+        'peak_forecast_date': sum_rf['max_forecast_date']
+    })
+    bot_resp = bot_engine.generate_response("What is my predicted electricity consumption over the next 30 days?")
+    assert len(bot_resp) > 50 and "Forecast Summary" in bot_resp
+    print("  ✓ AI Energy Assistant Chatbot generated rich data-grounded responses successfully!")
+
+    # -------------------------------------------------------------
+    # 16. NO CONSOLE / RUNTIME ERRORS
+    # -------------------------------------------------------------
+    print("\n[CHECK 16/17] Testing Clean app.py Module Import...")
     import app
     print("  ✓ app.py executed and imported with zero unhandled exceptions!")
 
     # -------------------------------------------------------------
-    # 16. ENVIRONMENT & DOCUMENTED COMMANDS
+    # 17. ENVIRONMENT & DOCUMENTED COMMANDS
     # -------------------------------------------------------------
-    print("\n[CHECK 16/16] Verifying Clean Environment Startup Commands...")
+    print("\n[CHECK 17/17] Verifying Clean Environment Startup Commands...")
     assert os.path.exists("requirements.txt"), "requirements.txt missing"
     assert os.path.exists("app.py"), "app.py missing"
+    assert os.path.exists("chatbot.py"), "chatbot.py missing"
     assert os.path.exists("data/household_power_daily.csv") or os.path.exists("data/household_power_consumption.txt"), "UCI dataset missing"
     assert os.path.exists("data/daily_weather_power.csv"), "Weather telemetry dataset missing"
     print("  ✓ All required files and directories are present and ready for deployment.")
 
     print("\n" + "=" * 85)
-    print(" ⭐ ALL 16 VERIFICATION CRITERIA PASSED WITH 100% SUCCESS! ⭐ ")
+    print(" ⭐ ALL VERIFICATION CRITERIA PASSED WITH 100% SUCCESS! ⭐ ")
     print("=" * 85)
 
 if __name__ == "__main__":
