@@ -3,6 +3,7 @@ visualization.py
 ----------------
 Modular Plotly visualization builders for Household Electricity Consumption
 Analysis and Forecasting.
+Styled with a premium, futuristic dark energy-tech aesthetic (Electric Cyan & Blue).
 """
 
 import os
@@ -14,33 +15,40 @@ import plotly.graph_objects as go
 from typing import Optional, List, Dict, Any
 
 
-# Clean, modern styling palette
-COLOR_PRIMARY = "#3B82F6"      # Bright blue
-COLOR_SECONDARY = "#10B981"    # Emerald green
-COLOR_ACCENT = "#F59E0B"       # Amber
-COLOR_DANGER = "#EF4444"       # Rose red
-COLOR_PURPLE = "#8B5CF6"       # Violet
-COLOR_DARK = "#1E293B"         # Slate dark
-COLOR_LIGHT_BG = "rgba(248, 250, 252, 0.8)"
+# Futuristic dark-energy color palette
+COLOR_PRIMARY = "#00F0FF"      # Electric Cyan
+COLOR_SECONDARY = "#3B82F6"    # Electric Blue
+COLOR_ACCENT = "#38BDF8"       # Sky Blue
+COLOR_DANGER = "#F43F5E"       # Rose Red (Peak)
+COLOR_SUCCESS = "#10B981"      # Emerald Green
+COLOR_WARNING = "#F59E0B"      # Amber
+COLOR_PURPLE = "#A855F7"       # Violet
+COLOR_DARK_SURFACE = "#0E1626" # Dark Navy Card
+COLOR_TEXT_MAIN = "#F8FAFC"    # Soft White
+COLOR_TEXT_MUTED = "#94A3B8"   # Slate Grey
 
 
 def apply_theme(fig: go.Figure, title: str = "", height: int = 450) -> go.Figure:
-    """Applies a clean, modern aesthetic to a Plotly figure."""
+    """Applies a premium futuristic dark energy-tech aesthetic to a Plotly figure."""
     fig.update_layout(
         title=dict(
             text=f"<b>{title}</b>" if title else "",
-            font=dict(size=16, family="Inter, system-ui, sans-serif"),
+            font=dict(size=15, family="Plus Jakarta Sans, Inter, system-ui, sans-serif", color=COLOR_TEXT_MAIN),
             x=0.02,
             y=0.96
         ),
-        template="plotly_white",
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(11, 17, 30, 0.55)",
         height=height,
-        margin=dict(l=40, r=30, t=50, b=40),
+        margin=dict(l=45, r=30, t=55, b=45),
+        font=dict(family="Plus Jakarta Sans, Inter, sans-serif", color="#E2E8F0"),
         hoverlabel=dict(
-            bgcolor="rgba(15, 23, 42, 0.9)",
+            bgcolor="#080C14",
+            bordercolor=COLOR_PRIMARY,
             font_size=12,
-            font_family="Inter, sans-serif",
-            font_color="#FFFFFF"
+            font_family="Plus Jakarta Sans, sans-serif",
+            font_color=COLOR_PRIMARY
         ),
         legend=dict(
             orientation="h",
@@ -48,16 +56,23 @@ def apply_theme(fig: go.Figure, title: str = "", height: int = 450) -> go.Figure
             y=1.02,
             xanchor="right",
             x=1,
-            bgcolor="rgba(255, 255, 255, 0.6)"
+            bgcolor="rgba(14, 22, 38, 0.75)",
+            bordercolor="rgba(56, 189, 248, 0.25)",
+            borderwidth=1,
+            font=dict(size=11, color="#CBD5E1")
         ),
         xaxis=dict(
             showgrid=True,
-            gridcolor="rgba(226, 232, 240, 0.7)",
+            gridcolor="rgba(148, 163, 184, 0.10)",
+            linecolor="rgba(148, 163, 184, 0.20)",
+            tickfont=dict(color="#94A3B8", size=10),
             zeroline=False
         ),
         yaxis=dict(
             showgrid=True,
-            gridcolor="rgba(226, 232, 240, 0.7)",
+            gridcolor="rgba(148, 163, 184, 0.10)",
+            linecolor="rgba(148, 163, 184, 0.20)",
+            tickfont=dict(color="#94A3B8", size=10),
             zeroline=False
         )
     )
@@ -77,7 +92,7 @@ def plot_overall_trend(daily_df: pd.DataFrame, target_col: str = "Daily_energy_k
         y=df[target_col],
         mode='lines',
         name='Daily Consumption (kWh)',
-        line=dict(color='rgba(148, 163, 184, 0.45)', width=1),
+        line=dict(color='rgba(148, 163, 184, 0.35)', width=1),
         hovertemplate='%{x|%b %d, %Y}<br>Actual: <b>%{y:.2f} kWh</b><extra></extra>'
     ))
     
@@ -86,7 +101,7 @@ def plot_overall_trend(daily_df: pd.DataFrame, target_col: str = "Daily_energy_k
         y=df['MA_7'],
         mode='lines',
         name='7-Day Moving Average',
-        line=dict(color=COLOR_PRIMARY, width=2),
+        line=dict(color=COLOR_PRIMARY, width=2.2),
         hovertemplate='%{x|%b %d, %Y}<br>7-Day MA: <b>%{y:.2f} kWh</b><extra></extra>'
     ))
     
@@ -95,13 +110,18 @@ def plot_overall_trend(daily_df: pd.DataFrame, target_col: str = "Daily_energy_k
         y=df['MA_30'],
         mode='lines',
         name='30-Day Moving Average',
-        line=dict(color=COLOR_ACCENT, width=2.5),
+        line=dict(color=COLOR_SECONDARY, width=2.5),
         hovertemplate='%{x|%b %d, %Y}<br>30-Day MA: <b>%{y:.2f} kWh</b><extra></extra>'
     ))
     
     fig.update_layout(
         xaxis=dict(
-            rangeslider=dict(visible=True, thickness=0.06),
+            rangeslider=dict(
+                visible=True,
+                thickness=0.06,
+                bgcolor="rgba(14, 22, 38, 0.85)",
+                bordercolor="rgba(56, 189, 248, 0.3)"
+            ),
             type="date"
         )
     )
@@ -116,17 +136,19 @@ def plot_daily_distribution(daily_df: pd.DataFrame, target_col: str = "Daily_ene
         nbins=40,
         marginal="box",
         color_discrete_sequence=[COLOR_PRIMARY],
-        opacity=0.8,
+        opacity=0.85,
         labels={target_col: "Daily Consumption (kWh)"}
     )
     
-    mean_val = daily_df[target_col].mean()
-    median_val = daily_df[target_col].median()
+    mean_val = float(daily_df[target_col].mean())
+    median_val = float(daily_df[target_col].median())
     
     fig.add_vline(x=mean_val, line_dash="dash", line_color=COLOR_DANGER,
-                  annotation_text=f"Mean: {mean_val:.2f} kWh", annotation_position="top right")
-    fig.add_vline(x=median_val, line_dash="dot", line_color=COLOR_SECONDARY,
-                  annotation_text=f"Median: {median_val:.2f} kWh", annotation_position="bottom right")
+                  annotation_text=f"Mean: {mean_val:.2f} kWh", annotation_position="top right",
+                  annotation_font=dict(color="#FDA4AF", size=10))
+    fig.add_vline(x=median_val, line_dash="dot", line_color=COLOR_ACCENT,
+                  annotation_text=f"Median: {median_val:.2f} kWh", annotation_position="bottom right",
+                  annotation_font=dict(color="#BAE6FD", size=10))
     
     return apply_theme(fig, title="Daily Energy Consumption Distribution & Spread", height=420)
 
@@ -137,6 +159,7 @@ def plot_monthly_consumption(daily_df: pd.DataFrame, target_col: str = "Daily_en
     month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     available_months = [m for m in month_order if m in df['month_name'].unique()]
     
+    palette = ['#00F0FF', '#38BDF8', '#3B82F6', '#60A5FA', '#93C5FD', '#818CF8', '#A855F7', '#C084FC', '#E879F9', '#F472B6', '#FB7185', '#FDA4AF']
     fig = px.box(
         df,
         x='month_name',
@@ -144,7 +167,7 @@ def plot_monthly_consumption(daily_df: pd.DataFrame, target_col: str = "Daily_en
         color='month_name',
         category_orders={'month_name': available_months},
         labels={'month_name': 'Month', target_col: 'Daily Energy (kWh)'},
-        color_discrete_sequence=px.colors.sequential.Blues_r
+        color_discrete_sequence=palette
     )
     fig.update_layout(showlegend=False)
     return apply_theme(fig, title="Monthly Seasonal Variations in Electricity Usage", height=430)
@@ -155,17 +178,18 @@ def plot_day_of_week_consumption(daily_df: pd.DataFrame, target_col: str = "Dail
     day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     dow_stats = daily_df.groupby('day_name')[target_col].agg(['mean', 'std', 'count']).reindex(day_order).dropna().reset_index()
     
-    colors = [COLOR_PRIMARY if d not in ['Saturday', 'Sunday'] else COLOR_ACCENT for d in dow_stats['day_name']]
+    colors = [COLOR_SECONDARY if d not in ['Saturday', 'Sunday'] else COLOR_PRIMARY for d in dow_stats['day_name']]
     
     fig = go.Figure()
     fig.add_trace(go.Bar(
         x=dow_stats['day_name'],
         y=dow_stats['mean'],
-        error_y=dict(type='data', array=dow_stats['std'], visible=True, color="rgba(100, 116, 139, 0.6)"),
+        error_y=dict(type='data', array=dow_stats['std'], visible=True, color="rgba(148, 163, 184, 0.4)"),
         marker_color=colors,
         text=[f"{v:.2f} kWh" for v in dow_stats['mean']],
         textposition="outside",
-        hovertemplate='<b>%{x}</b><br>Average: %{y:.2f} kWh<br>Std Dev: ±%{error_y.array:.2f} kWh<extra></extra>'
+        textfont=dict(color="#F8FAFC", size=10),
+        hovertemplate='<b>%{x}</b><br>Average: <b>%{y:.2f} kWh</b><br>Std Dev: ±%{error_y.array:.2f} kWh<extra></extra>'
     ))
     return apply_theme(fig, title="Average Electricity Consumption by Day of Week", height=420)
 
@@ -183,8 +207,8 @@ def plot_weekday_vs_weekend(daily_df: pd.DataFrame, target_col: str = "Daily_ene
         box=True,
         points="outliers",
         color_discrete_map={
-            'Weekday (Mon-Fri)': COLOR_PRIMARY,
-            'Weekend (Sat-Sun)': COLOR_ACCENT
+            'Weekday (Mon-Fri)': COLOR_SECONDARY,
+            'Weekend (Sat-Sun)': COLOR_PRIMARY
         },
         labels={'Day_Type': 'Day Type', target_col: 'Daily Energy (kWh)'}
     )
@@ -197,12 +221,10 @@ def plot_hourly_consumption_pattern(hourly_dict: Optional[Dict[str, Any]] = None
     Plots the 24-Hour Diurnal Hourly Load Profile showing typical intraday electricity consumption.
     """
     if hourly_dict is None:
-        # Load from models/hourly_profile.json if available
         if os.path.exists("models/hourly_profile.json"):
             with open("models/hourly_profile.json", "r") as f:
                 hourly_dict = json.load(f)
         else:
-            # Realistic synthetic fallback profile for display
             hours = list(range(24))
             base_kw = [0.55, 0.48, 0.45, 0.43, 0.44, 0.52, 0.85, 1.35, 1.42, 1.15,
                        1.05, 1.02, 1.10, 1.08, 1.05, 1.12, 1.35, 1.68, 1.88, 1.95,
@@ -229,7 +251,7 @@ def plot_hourly_consumption_pattern(hourly_dict: Optional[Dict[str, Any]] = None
         x=hours + hours[::-1],
         y=upper + lower[::-1],
         fill='toself',
-        fillcolor='rgba(59, 130, 246, 0.15)',
+        fillcolor='rgba(0, 240, 255, 0.12)',
         line=dict(color='rgba(255,255,255,0)'),
         hoverinfo='skip',
         showlegend=True,
@@ -250,19 +272,21 @@ def plot_hourly_consumption_pattern(hourly_dict: Optional[Dict[str, Any]] = None
     # Highlight Peak Period (18:00 - 22:00)
     fig.add_vrect(
         x0="18:00", x1="22:00",
-        fillcolor="rgba(239, 68, 68, 0.12)",
+        fillcolor="rgba(244, 63, 94, 0.14)",
         layer="below", line_width=0,
-        annotation_text="Evening Peak Window (18:00–22:00)",
-        annotation_position="top left"
+        annotation_text="Evening Peak (18:00–22:00)",
+        annotation_position="top left",
+        annotation_font=dict(color="#FDA4AF", size=10)
     )
     
     # Highlight Off-Peak Valley (01:00 - 05:00)
     fig.add_vrect(
         x0="01:00", x1="05:00",
-        fillcolor="rgba(16, 185, 129, 0.10)",
+        fillcolor="rgba(16, 185, 129, 0.12)",
         layer="below", line_width=0,
         annotation_text="Off-Peak Valley (01:00–05:00)",
-        annotation_position="bottom left"
+        annotation_position="bottom left",
+        annotation_font=dict(color="#6EE7B7", size=10)
     )
     
     return apply_theme(fig, title="24-Hour Diurnal Electricity Consumption Pattern (Average Power in kW)", height=430)
@@ -285,22 +309,22 @@ def plot_submetering_breakdown(daily_df: pd.DataFrame) -> Optional[go.Figure]:
     fig.add_trace(go.Scatter(
         x=smoothed.index, y=smoothed['Climate/Heating (Sub 3, kWh)'],
         mode='lines', stackgroup='one', name='Climate & Water Heater (Sub 3)',
-        line=dict(width=0.5, color="#F59E0B")
+        line=dict(width=0.5, color=COLOR_PRIMARY)
     ))
     fig.add_trace(go.Scatter(
         x=smoothed.index, y=smoothed['Laundry (Sub 2, kWh)'],
         mode='lines', stackgroup='one', name='Laundry Room (Sub 2)',
-        line=dict(width=0.5, color="#10B981")
+        line=dict(width=0.5, color=COLOR_SECONDARY)
     ))
     fig.add_trace(go.Scatter(
         x=smoothed.index, y=smoothed['Kitchen (Sub 1, kWh)'],
         mode='lines', stackgroup='one', name='Kitchen (Sub 1)',
-        line=dict(width=0.5, color="#3B82F6")
+        line=dict(width=0.5, color=COLOR_PURPLE)
     ))
     fig.add_trace(go.Scatter(
         x=smoothed.index, y=smoothed['Other Appliances (kWh)'],
         mode='lines', stackgroup='one', name='Other Base Load & Lighting',
-        line=dict(width=0.5, color="#94A3B8")
+        line=dict(width=0.5, color="#64748B")
     ))
     
     return apply_theme(fig, title="Sub-Metering Energy Breakdown Over Time", height=440)
@@ -318,10 +342,11 @@ def plot_weather_correlation(daily_df: pd.DataFrame, target_col: str = "Daily_en
         y=target_col,
         color=daily_df['Weather condition'] if 'Weather condition' in daily_df.columns else temp_col,
         trendline="ols",
-        labels={temp_col: "Ambient Temperature (°C)", target_col: "Electricity Consumption (kWh)"},
-        title="Impact of Ambient Temperature on Electricity Consumption"
+        trendline_color_override=COLOR_DANGER,
+        color_discrete_sequence=[COLOR_PRIMARY, COLOR_SECONDARY, COLOR_PURPLE, COLOR_WARNING],
+        labels={temp_col: "Ambient Temperature (°C)", target_col: "Electricity Consumption (kWh)"}
     )
-    return apply_theme(fig, title="Electricity Consumption vs Ambient Temperature (°C)", height=440)
+    return apply_theme(fig, title="Impact of Ambient Temperature on Electricity Consumption", height=440)
 
 
 def plot_occupancy_impact(daily_df: pd.DataFrame, target_col: str = "Daily_energy_kWh") -> Optional[go.Figure]:
@@ -330,11 +355,13 @@ def plot_occupancy_impact(daily_df: pd.DataFrame, target_col: str = "Daily_energ
     if occ_col is None:
         return None
         
+    palette_occ = ['#00F0FF', '#38BDF8', '#3B82F6', '#818CF8', '#A855F7']
     fig = px.box(
         daily_df,
         x=occ_col,
         y=target_col,
         color=occ_col,
+        color_discrete_sequence=palette_occ,
         labels={occ_col: "Number of People at Home", target_col: "Electricity Consumption (kWh)"}
     )
     fig.update_layout(showlegend=False)
@@ -353,11 +380,12 @@ def plot_peak_analysis(daily_df: pd.DataFrame, target_col: str = "Daily_energy_k
         orientation='h',
         marker=dict(
             color=top_days[target_col],
-            colorscale='YlOrRd',
+            colorscale=[[0, COLOR_SECONDARY], [0.5, COLOR_PRIMARY], [1, COLOR_DANGER]],
             showscale=False
         ),
         text=[f"{v:.2f} kWh" for v in top_days[target_col]],
         textposition="outside",
+        textfont=dict(color="#F8FAFC", size=10),
         hovertemplate='<b>%{y}</b><br>Peak Consumption: <b>%{x:.2f} kWh</b><extra></extra>'
     ))
     return apply_theme(fig, title=f"Top {top_n} Peak Electricity Consumption Days", height=440)
@@ -373,9 +401,14 @@ def plot_feature_importances(importances: Dict[str, float], top_n: int = 12) -> 
         x=scores,
         y=features,
         orientation='h',
-        marker=dict(color=COLOR_PRIMARY),
+        marker=dict(
+            color=scores,
+            colorscale=[[0, COLOR_SECONDARY], [1, COLOR_PRIMARY]],
+            showscale=False
+        ),
         text=[f"{s:.3f}" for s in scores],
         textposition="outside",
+        textfont=dict(color="#F8FAFC", size=10),
         hovertemplate='<b>%{y}</b><br>Importance Score: <b>%{x:.4f}</b><extra></extra>'
     ))
     return apply_theme(fig, title=f"Top {top_n} Key Forecasting Drivers (Feature Importance)", height=420)
@@ -396,8 +429,8 @@ def plot_actual_vs_predicted(
         x=test_dates,
         y=actual,
         mode='lines',
-        name='Actual Consumption',
-        line=dict(color='#0F172A', width=2),
+        name='Actual Ground Truth',
+        line=dict(color='#94A3B8', width=1.8),
         hovertemplate='%{x|%b %d, %Y}<br>Actual: <b>%{y:.2f} kWh</b><extra></extra>'
     ))
     
@@ -422,11 +455,16 @@ def plot_actual_vs_predicted(
         
     fig.update_layout(
         xaxis=dict(
-            rangeslider=dict(visible=True, thickness=0.06),
+            rangeslider=dict(
+                visible=True,
+                thickness=0.06,
+                bgcolor="rgba(14, 22, 38, 0.85)",
+                bordercolor="rgba(56, 189, 248, 0.3)"
+            ),
             type="date"
         )
     )
-    return apply_theme(fig, title="Out-of-Sample Test Evaluation: Actual vs ML Model Forecasts", height=480)
+    return apply_theme(fig, title="Out-of-Sample Test Evaluation: Actual vs Model Forecasts", height=480)
 
 
 def plot_future_forecast(
@@ -441,9 +479,9 @@ def plot_future_forecast(
         x=historical_tail_df.index,
         y=historical_tail_df[target_col],
         mode='lines+markers',
-        name='Recent Historical',
-        line=dict(color='#64748B', width=2),
-        marker=dict(size=4),
+        name='Recent Historical Actuals',
+        line=dict(color='#94A3B8', width=2),
+        marker=dict(size=4, color='#94A3B8'),
         hovertemplate='%{x|%b %d, %Y}<br>Historical: <b>%{y:.2f} kWh</b><extra></extra>'
     ))
     
@@ -457,15 +495,15 @@ def plot_future_forecast(
         y=[last_hist_val, first_fc_val],
         mode='lines',
         showlegend=False,
-        line=dict(color=COLOR_PRIMARY, width=2.5, dash='dash')
+        line=dict(color=COLOR_PRIMARY, width=2.2, dash='dash')
     ))
     
     fig.add_trace(go.Scatter(
         x=forecast_df.index,
         y=forecast_df['Forecast_kWh'],
         mode='lines+markers',
-        name='Future Forecast',
-        line=dict(color=COLOR_PRIMARY, width=2.5),
+        name='Future AI Forecast',
+        line=dict(color=COLOR_PRIMARY, width=2.8),
         marker=dict(size=6, color=COLOR_PRIMARY),
         hovertemplate='%{x|%b %d, %Y (%a)}<br>Forecast: <b>%{y:.2f} kWh</b><extra></extra>'
     ))
@@ -477,7 +515,7 @@ def plot_future_forecast(
         x=list(forecast_df.index) + list(forecast_df.index[::-1]),
         y=list(upper_bound) + list(lower_bound[::-1]),
         fill='toself',
-        fillcolor='rgba(59, 130, 246, 0.12)',
+        fillcolor='rgba(0, 240, 255, 0.14)',
         line=dict(color='rgba(255,255,255,0)'),
         hoverinfo="skip",
         showlegend=True,
@@ -497,8 +535,9 @@ def plot_training_loss(history_dict: Dict[str, List[float]]) -> go.Figure:
         y=history_dict['loss'],
         mode='lines+markers',
         name='Training Loss (MSE)',
-        line=dict(color=COLOR_PRIMARY, width=2),
-        marker=dict(size=4)
+        line=dict(color=COLOR_PRIMARY, width=2.2),
+        marker=dict(size=4, color=COLOR_PRIMARY),
+        hovertemplate='Epoch %{x}<br>Train Loss: <b>%{y:.5f}</b><extra></extra>'
     ))
     
     if 'val_loss' in history_dict and history_dict['val_loss']:
@@ -507,8 +546,9 @@ def plot_training_loss(history_dict: Dict[str, List[float]]) -> go.Figure:
             y=history_dict['val_loss'],
             mode='lines+markers',
             name='Validation Loss (MSE)',
-            line=dict(color=COLOR_ACCENT, width=2),
-            marker=dict(size=4)
+            line=dict(color=COLOR_SECONDARY, width=2.2),
+            marker=dict(size=4, color=COLOR_SECONDARY),
+            hovertemplate='Epoch %{x}<br>Val Loss: <b>%{y:.5f}</b><extra></extra>'
         ))
         
-    return apply_theme(fig, title="Model Training & Validation Convergence Curve", height=380)
+    return apply_theme(fig, title="LSTM Neural Network: Training vs Validation Loss Convergence Curve", height=390)
